@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -47,7 +48,7 @@ func main() {
 	// 	c.HTML(200, "favicon.ico", nil)
 	// })
 
-	r.POST("/api/html", func(c *gin.Context) {
+	r.POST("/api/csv", func(c *gin.Context) {
 		bodyBytes, err := ioutil.ReadAll(c.Request.Body)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot read request body"})
@@ -84,12 +85,53 @@ func main() {
 			fmt.Println("Error parsing HTML:", err)
 		}
 
-		c.JSON(http.StatusOK, csvString)
+		c.String(http.StatusOK, csvString)
 		fmt.Println("convertion completed")
-		// Respond with the received data
-		// c.JSON(http.StatusOK, gin.H{
-		// 	"csv": "csv",
-		// })
+	})
+
+	r.POST("/api/csv/download", func(c *gin.Context) {
+		bodyBytes, err := ioutil.ReadAll(c.Request.Body)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot read request body"})
+			return
+		}
+
+		// Convert the body to a string
+		content := string(bodyBytes)
+		content = strings.TrimPrefix(content, "content=")
+
+		fmt.Println("validating html content")
+		// validating content
+		if err := isValidHTML(content); err != nil {
+			fmt.Println("Invalid HTML:", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		} else {
+			fmt.Println("HTML is valid")
+		}
+
+		fmt.Println("decoding content")
+		// decoding content
+		content, err = url.QueryUnescape(content)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			fmt.Println("Error decoding content:", err)
+			return
+		}
+
+		// check if content has table
+		fmt.Println("converting content...")
+		csvString, err := convertToCsv(content)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			fmt.Println("Error parsing HTML:", err)
+		}
+		// fmt.Println("csvString", csvString)
+
+		c.Header("Content-Type", "text/csv")
+		c.Header("Content-Disposition", "attachment;filename=report.csv")
+
+		c.String(http.StatusOK, csvString)
+		fmt.Println("convertion completed")
 	})
 
 	r.Run() // listen and serve on 0.0.0.0:8080
@@ -112,16 +154,30 @@ func convertToCsv(htmlContent string) (csvString string, err error) {
 	if !hasNode {
 		return csvString, errors.New("no table")
 	}
-	fmt.Println("table node", node.Data)
+	// fmt.Println("table node", node.Data)
 
 	csvContent := &CsvContent{
 		contents: make([][]string, 0),
 	}
 	getTableData(node, csvContent)
+	formatData(csvContent)
 
 	csvString, err = getTableInCsv(csvContent.contents)
 	// fmt.Println(csvString)
 	return
+}
+
+func formatData(csvContent *CsvContent) {
+	for i, _ := range csvContent.contents {
+		for j, _ := range csvContent.contents[i] {
+			csvContent.contents[i][j] = fmt.Sprint(strings.ReplaceAll(csvContent.contents[i][j], "\n", " "))
+
+			// to replace multiple spaces with a single space in a string
+			re := regexp.MustCompile(`\s+`)
+			csvContent.contents[i][j] = re.ReplaceAllString(csvContent.contents[i][j], " ")
+			csvContent.contents[i][j] = fmt.Sprint(strings.TrimSpace(csvContent.contents[i][j]))
+		}
+	}
 }
 
 func getTableInCsv(csvContent [][]string) (csvString string, err error) {
@@ -162,8 +218,7 @@ func getTableData(n *html.Node, csvContent *CsvContent) {
 			row := make([]string, 0)
 			for c1 := c.FirstChild; c1 != nil; c1 = c1.NextSibling {
 				if c1.Data == "td" || c1.Data == "th" {
-					row = append(row, c1.FirstChild.Data)
-					// fmt.Println("td c.Data", c1.FirstChild.Data)
+					row = append(row, getAllSiblings(c1.FirstChild))
 				}
 			}
 			// fmt.Println("row", row)
@@ -173,7 +228,19 @@ func getTableData(n *html.Node, csvContent *CsvContent) {
 		}
 		getTableData(c, csvContent)
 	}
+	return
+}
 
+func getAllSiblings(node *html.Node) (val string) {
+	if node.Type == html.TextNode {
+		val = node.Data
+	}
+	if node.NextSibling != nil {
+		val = val + " " + getAllSiblings(node.NextSibling)
+	}
+	if node.FirstChild != nil {
+		val = val + " " + getAllSiblings(node.FirstChild)
+	}
 	return
 }
 

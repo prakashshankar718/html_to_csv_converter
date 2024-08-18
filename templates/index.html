@@ -6,12 +6,6 @@
     <title>Converter App</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
     <style>
-      h1 {
-        text-align: center;
-      }
-      p {
-        text-align: center;
-      }
       body {
         text-align: center;
       }
@@ -20,13 +14,14 @@
   <body>
     <h1>HTML to CSV Converter</h1>
     <p>Place HTML content in textbox and click sumbit.</p>
-    <form action="/api/html" method="post" target="my_iframe">
+    <form action="/api/csv" method="post" target="my_iframe">
       <!-- <label for="content">content:</label><br> -->
-      <textarea placeholder="<html></html>" rows="20" cols="160" name="content">html</textarea><br /><br />
+      <textarea placeholder="<html></html>" rows="20" cols="160" name="content"></textarea><br /><br />
       <input type="submit" value="Submit" />
+      <input type="submit" formaction="/api/csv/download" value="Download">
     </form>
     <br />
-    <label style="font-size:20px;">csv value</label><br />
-    <iframe name="my_iframe" width="60%" height="30%"></iframe>
+    <label style="font-size:15px;">Result</label><br />
+    <iframe name="my_iframe" width="80%" height="30%"></iframe>
   </body>
 </html>
