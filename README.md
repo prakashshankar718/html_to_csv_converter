@@ -1,2 +1,2 @@
 # html_to_csv_converter
-A standalone html table to csv converter
+A html table to csv converter web application
