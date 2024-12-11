@@ -50,6 +50,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./actions
+        asset_path: ./html_to_csv_converter
         asset_name: actions
         asset_content_type: application/octet-stream
